@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RoPE Visualized - Step Demo</title>
+    <meta
+      name="description"
+      content="A minimal interactive step-by-step demo for understanding rotary positional embeddings."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div>
+        <p class="eyebrow">Interactive demo</p>
+        <h1>RoPE Visualized</h1>
+      </div>
+      <div class="header-actions">
+        <span>Keys: ← →</span>
+        <button id="resetBtn" class="icon-button" type="button" aria-label="Reset" title="Reset">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 12a9 9 0 1 0 3-6.7" />
+            <path d="M3 4v6h6" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="lesson-shell">
+      <nav class="step-nav" aria-label="Demo steps">
+        <div class="progress-line"><span id="progressFill"></span></div>
+        <ol id="stepNav"></ol>
+      </nav>
+
+      <section class="lesson-card" aria-live="polite">
+        <div class="lesson-top">
+          <div>
+            <p id="stepKicker" class="eyebrow">Step 1 of 8</p>
+            <h2 id="stepTitle">Text becomes tokens</h2>
+          </div>
+          <p id="stepClaim" class="claim">A sentence is split into ordered token slots.</p>
+        </div>
+
+        <div id="stepBody" class="step-body"></div>
+
+        <footer class="lesson-footer">
+          <button id="prevBtn" class="secondary-button" type="button">Previous</button>
+          <button id="tryBtn" class="ghost-button" type="button">Try it</button>
+          <button id="nextBtn" class="primary-button" type="button">Next</button>
+        </footer>
+      </section>
+    </main>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>
