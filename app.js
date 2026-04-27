@@ -3,6 +3,7 @@ const POS_SCALE = 0.52;
 const VECTOR_SCALE = 104;
 const MAX_TOKENS = 24;
 const MAX_VISUAL_TOKENS = 12;
+const THETA_STEP_MAX = 11;
 const THETA_LOG_MIN = 0.3;
 const THETA_LOG_MAX = 5;
 const THETA_LOG_DEFAULT = 4;
@@ -55,8 +56,8 @@ const STEPS = [
   },
   {
     name: "Theta",
-    title: "Theta sets rotation speed",
-    claim: "Theta controls how quickly positions spread around the circle.",
+    title: "Theta changes angular spacing",
+    claim: "Theta changes frequency; frequency changes the rotation angle.",
     mode: "rope"
   },
   {
@@ -198,12 +199,14 @@ const state = {
   orderToken: "dog",
   funnyExample: 0,
   funnyVariant: 0,
+  thetaPosition: 0,
   thetaLog: THETA_LOG_DEFAULT,
   mode: "none"
 };
 
 const el = {};
 let liveUpdateFrame = 0;
+let thetaTimer = 0;
 
 document.addEventListener("DOMContentLoaded", () => {
   ["stepNav", "progressFill", "stepKicker", "stepTitle", "stepClaim", "stepBody", "prevBtn", "tryBtn", "nextBtn", "resetBtn"].forEach((id) => {
@@ -257,7 +260,11 @@ function setStep(next) {
     state.pair = 0;
     state.rotationPosition = state.selected;
   }
-  if (state.step === 6 && previousStep !== state.step) state.pair = 1;
+  if (state.step === 6 && previousStep !== state.step) {
+    state.pair = 2;
+    state.thetaLog = 2;
+    state.thetaPosition = 0;
+  }
   if (state.step === 7) {
     state.start = Math.max(state.start, 4);
     syncRelativePair();
@@ -452,7 +459,7 @@ function stepTheta() {
   return `
     <div class="control-row">
       ${tokenControls()}
-      ${pairReadout()}
+      ${pairReadout(2)}
       ${thetaControl()}
     </div>
     <div class="visual-grid">
@@ -464,10 +471,8 @@ function stepTheta() {
 
 function thetaDetails() {
   return `
-    <h3>Position trail</h3>
-    ${thetaEquation()}
-    ${thetaLesson()}
-    ${thetaAngleTable()}
+    <h3>Rate per step</h3>
+    ${thetaRatePanel()}
   `;
 }
 
@@ -724,20 +729,22 @@ function pairControl(minPair = 0) {
   `;
 }
 
-function pairReadout() {
+function pairReadout(minPair = 0) {
+  state.pair = Math.max(state.pair, minPair);
   const freq = invFreq(state.pair);
+  const pairs = Array.from({ length: DIM / 2 }, (_, pair) => pair).filter((pair) => pair >= minPair);
   return `
     <div class="field readout-field pair-readout">
-      <span>coordinate pair from the same e vector</span>
+      <span>${minPair ? "theta-sensitive coordinate pair" : "coordinate pair from the same e vector"}</span>
       <div class="dim-pair-row" aria-label="Embedding coordinate pairs">
-        ${Array.from({ length: DIM / 2 }, (_, pair) => `
+        ${pairs.map((pair) => `
           <button class="dim-pair ${pair === state.pair ? "is-active" : ""}" type="button" data-pair="${pair}">
             <b>${coordPairDisplay(pair)}</b>
             <i style="--speed:${pairSpeed(pair)}%"></i>
           </button>
         `).join("")}
       </div>
-      <div class="readout-pill">current freq ${freq.toFixed(4)} | larger pair = slower turn</div>
+      <div class="readout-pill">frequency ${freq.toFixed(4)} | pair 0 skipped: freq stays 1</div>
     </div>
   `;
 }
@@ -933,16 +940,49 @@ function shiftLesson() {
 
 function thetaLesson() {
   const freq = invFreq(state.pair);
+  const angle = 11 * freq;
   return `
     <div class="theta-panel">
       <div class="formula">
-        <span class="chip amber">freq ${freq.toFixed(4)}</span>
-        <span class="chip teal">pos 11 -> angle ${(11 * freq).toFixed(2)}</span>
+        <span class="chip amber">position gap 11</span>
+        <span class="chip amber">frequency ${freq.toFixed(4)}</span>
+        <span class="chip teal">angle ${angle.toFixed(2)}</span>
       </div>
       <div class="theta-compare">
-        <span><strong>lower theta</strong> positions separate fast</span>
-        <span><strong>higher theta</strong> positions drift slowly</span>
+        <span><strong>lower theta</strong> bigger turn</span>
+        <span><strong>higher theta</strong> smaller turn</span>
       </div>
+    </div>
+  `;
+}
+
+function thetaRatePanel() {
+  const freq = invFreq(state.pair);
+  const step = state.thetaPosition;
+  const angle = step * freq;
+  const exponent = (-2 * state.pair) / DIM;
+  return `
+    <div class="theta-rate-card">
+      <div class="theta-equation-strip">
+        <code>freq = theta<sup>(-2i/D)</sup></code>
+        <div class="theta-equation-values">
+          <span><b>theta</b><strong>${formatThetaBase(thetaBase())}</strong></span>
+          <i>^</i>
+          <span><b>-2i/D</b><strong>${exponent.toFixed(2)}</strong></span>
+          <i>=</i>
+          <span class="is-result"><b>frequency</b><strong>${freq.toFixed(4)}</strong></span>
+        </div>
+      </div>
+      <div class="theta-current-step">
+        <span><b>current step</b><strong>${step}</strong></span>
+        <span><b>angle</b><strong>${angle.toFixed(2)}</strong></span>
+      </div>
+      <div class="theta-step-track" aria-label="Animated position step">
+        ${Array.from({ length: THETA_STEP_MAX + 1 }, (_, position) => `
+          <span class="${position === step ? "is-active" : ""}">${position}</span>
+        `).join("")}
+      </div>
+      <p>Each tick adds one position. Lower theta turns more per tick; higher theta turns less.</p>
     </div>
   `;
 }
@@ -969,7 +1009,7 @@ function thetaEquation() {
   const freq = invFreq(state.pair);
   return `
     <div class="calc-card">
-      <div class="calc-title">Frequency from theta: pair i=${pairIndex}, embedding width D=${DIM}</div>
+      <div class="calc-title">frequency = theta^(-2i/D), with i=${pairIndex}, D=${DIM}</div>
       <div class="calc-flow">
         <span><b>theta</b><strong>${formatThetaBase(thetaBase())}</strong></span>
         <i>^</i>
@@ -1106,7 +1146,7 @@ function thetaSweepSvg() {
   const height = 380;
   const token = activeTokens()[state.selected];
   const baseVector = tokenVector(token);
-  const targetPosition = 11;
+  const targetPosition = state.thetaPosition;
   const freq = invFreq(state.pair);
   const angle = targetPosition * freq;
   const basePair = pairPoint(baseVector, state.pair);
@@ -1114,6 +1154,10 @@ function thetaSweepSvg() {
   const displayRadius = 92;
   const base = directionToSvg(basePair, displayRadius);
   const last = directionToSvg(rotatedPair, displayRadius);
+  const stepPoints = Array.from({ length: THETA_STEP_MAX + 1 }, (_, position) => ({
+    position,
+    point: directionToSvg(pairPoint(rotateVector(baseVector, position), state.pair), displayRadius)
+  }));
   const orbitRadius = Math.max(30, Math.hypot(base.x, base.y));
   const color = colorFor(state.selected);
   const arc = rotationArcPath(orbitRadius + 18, base, angle);
@@ -1127,13 +1171,16 @@ function thetaSweepSvg() {
     `<text class="axis-label" x="244" y="-8">${coordLabel(state.pair * 2)}</text>`,
     `<text class="axis-label" x="8" y="-174">${coordLabel(state.pair * 2 + 1)}</text>`,
     drawVector(base.x, base.y, "#8d9996", "theta-base"),
+    ...stepPoints.map(({ position, point }) => `
+      <circle class="theta-step-dot ${position === targetPosition ? "is-active" : ""}" cx="${point.x}" cy="${point.y}" r="${position === targetPosition ? 7 : 4}" />
+    `),
     arc ? `<path class="angle-arc" d="${arc}" stroke="${color}" />` : "",
     drawVector(last.x, last.y, color, ""),
     `<circle class="theta-point base-point" cx="${base.x}" cy="${base.y}" r="5.6" />`,
     `<circle class="theta-point end-point" cx="${last.x}" cy="${last.y}" r="7" fill="${color}" />`,
-    thetaBadge("pos 0", base.x, base.y, "base"),
-    thetaBadge("pos 11", last.x, last.y, "end"),
-    `<text class="angle-label" x="-252" y="-150">angle = 11 x ${freq.toFixed(4)}</text>`
+    thetaBadge("step 0", base.x, base.y, "base"),
+    targetPosition > 0 ? thetaBadge(`step ${targetPosition}`, last.x, last.y, "end") : "",
+    `<text class="angle-label" x="-252" y="-150">angle = ${targetPosition} x ${freq.toFixed(4)}</text>`
   ];
   parts.push(`</svg>`);
   return parts.join("");
@@ -1365,6 +1412,8 @@ function bindStepBody() {
       render();
     });
   });
+  if (state.step === 6) startThetaLoop();
+  else stopThetaLoop();
 }
 
 function bindTokenHits(root) {
@@ -1441,6 +1490,24 @@ function scheduleLiveUpdate(callback) {
     liveUpdateFrame = 0;
     callback();
   });
+}
+
+function startThetaLoop() {
+  if (thetaTimer) return;
+  thetaTimer = window.setInterval(() => {
+    if (state.step !== 6) {
+      stopThetaLoop();
+      return;
+    }
+    state.thetaPosition = (state.thetaPosition + 1) % (THETA_STEP_MAX + 1);
+    updateThetaLive();
+  }, 850);
+}
+
+function stopThetaLoop() {
+  if (!thetaTimer) return;
+  window.clearInterval(thetaTimer);
+  thetaTimer = 0;
 }
 
 function scrollToLessonTop() {
