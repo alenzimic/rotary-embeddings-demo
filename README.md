@@ -12,6 +12,20 @@ Source repository:
 
 [https://github.com/alenzimic/rotary-embeddings-demo](https://github.com/alenzimic/rotary-embeddings-demo)
 
+## Preview
+
+### Tokenize and ground the sentence
+
+<img src="docs/screenshots/01-tokenize.png" alt="RoPE Visualized tokenize step showing a sentence split into tokens and position ids." width="720">
+
+### Watch theta change the RoPE frequency
+
+<img src="docs/screenshots/02-theta-frequency.png" alt="Theta step showing the RoPE frequency equation and rotation diagram." width="720">
+
+### Try position-sensitive examples
+
+<img src="docs/screenshots/03-position-examples.png" alt="AGI Theater step showing how moving one word changes sentence meaning and RoPE position." width="720">
+
 ## What It Shows
 
 This demo walks through embeddings as a concrete visual object:
